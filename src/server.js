@@ -110,7 +110,7 @@ fastify.get('/ops/receipts', async (req) => {
 });
 
 const start = async () => {
-  await fastify.listen({ port: PORT, host: '127.0.0.1' });
+  await fastify.listen({ port: PORT, host: process.env.RAILWAY_STATIC_URL ? '0.0.0.0' : '127.0.0.1' });
   console.log(`404 Mentions API on :${PORT}`);
 };
 start();

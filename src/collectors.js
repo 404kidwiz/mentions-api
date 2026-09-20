@@ -46,7 +46,7 @@ async function hnSearch(product, days, tags) {
     text: (h.comment_text || h.url || '').slice(0, 300),
     points: h.points,
     created_utc: h.created_at_i,
-    url: `https://news.ycombinator.com/item?id=${h.story_id || h.objectID}`,
+    url: `https://news.ycombinator.com/item?id=${h.objectID}`,
     num_comments: h.num_comments || 0,
   }));
 }
@@ -75,18 +75,31 @@ async function collectMentions(product, days) {
   const all = [];
   if (reddit.status === 'fulfilled') all.push(...reddit.value);
   if (hn.status === 'fulfilled') all.push(...hn.value);
+  // If EVERY configured source failed, that's an upstream failure — never bill.
+  if (!all.length && reddit.status === 'rejected' && hn.status === 'rejected') {
+    throw new Error(`all sources failed: ${String(hn.reason || reddit.reason)}`);
+  }
   // filter by window
   const sinceMs = Date.now() - days * 86400 * 1000;
   const inWindow = all.filter(m => (m.created_utc || 0) * 1000 >= sinceMs);
   const complaints = inWindow.filter(isComplaint).length;
+  // source counts reflect FILTERED (in-window) results, not raw search hits
+  const inWinReddit = inWindow.filter(m => m.source === 'reddit').length;
+  const inWinHn = inWindow.filter(m => m.source === 'hn').length;
+  // truncated = we hit a search-result cap, so counts are bounded, not exhaustive
+  const truncated =
+    (reddit.status === 'fulfilled' && reddit.value.length >= 100) ||
+    (hn.status === 'fulfilled' && hn.value.length >= 200);
   return {
     mentions: inWindow.slice(0, 200),
     total: inWindow.length,
     complaints,
     sources: {
-      reddit: reddit.status === 'fulfilled' ? reddit.value.length : null,
-      hn: hn.status === 'fulfilled' ? hn.value.length : null,
+      reddit: reddit.status === 'fulfilled' ? inWinReddit : null,
+      hn: hn.status === 'fulfilled' ? inWinHn : null,
     },
+    truncated: !!truncated,
+    partial_failure: reddit.status === 'rejected' || hn.status === 'rejected' || null,
   };
 }
 

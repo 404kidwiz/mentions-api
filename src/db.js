@@ -69,7 +69,22 @@ const recentCalls = db.prepare(
   'SELECT * FROM calls ORDER BY id DESC LIMIT ?'
 );
 
+// Atomic billing: cap-check + credit debit + receipt insert in ONE transaction.
+// Returns remaining credits, or 'CAP' / 'NO_CREDITS'. No charge can occur
+// without its receipt, and concurrent requests cannot exceed cap or credits.
+const billCall = db.transaction((businessId, dailyCap, callRow) => {
+  const biz = getBusiness.get(businessId);
+  if (!biz) return 'NO_BUSINESS';
+  const used = callsToday.get(businessId).n;
+  if (used >= dailyCap) return 'CAP';
+  if (biz.credits <= 0) return 'NO_CREDITS';
+  const upd = db.prepare('UPDATE businesses SET credits = credits - 1 WHERE id = ? AND credits > 0').run(businessId);
+  if (upd.changes !== 1) return 'NO_CREDITS';
+  insertCall.run(callRow);
+  return getBusiness.get(businessId).credits;
+});
+
 module.exports = {
   db, newKey, createBusiness, getBusinessByKey, getBusiness, listBusinesses,
-  decCredits, addCredits, callsToday, insertCall, stats, recentCalls,
+  decCredits, addCredits, callsToday, insertCall, stats, recentCalls, billCall,
 };

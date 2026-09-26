@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS calls (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_calls_biz ON calls(business_id, created_at);
+CREATE TABLE IF NOT EXISTS stripe_events (
+  id TEXT PRIMARY KEY,                      -- Stripe event id (evt_...)
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 const newKey = () => 'biz_' + require('crypto').randomBytes(6).toString('base64url');
@@ -68,6 +72,8 @@ const stats = db.prepare(`
 const recentCalls = db.prepare(
   'SELECT * FROM calls ORDER BY id DESC LIMIT ?'
 );
+const stripeEventSeen = db.prepare('SELECT id FROM stripe_events WHERE id = ?');
+const recordStripeEvent = db.prepare('INSERT INTO stripe_events (id) VALUES (?)');
 
 // Atomic billing: cap-check + credit debit + receipt insert in ONE transaction.
 // Returns remaining credits, or 'CAP' / 'NO_CREDITS'. No charge can occur
@@ -87,4 +93,5 @@ const billCall = db.transaction((businessId, dailyCap, callRow) => {
 module.exports = {
   db, newKey, createBusiness, getBusinessByKey, getBusiness, listBusinesses,
   decCredits, addCredits, callsToday, insertCall, stats, recentCalls, billCall,
+  stripeEventSeen, recordStripeEvent,
 };

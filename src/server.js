@@ -10,6 +10,9 @@ const collectors = require('./collectors');
 const PORT = process.env.PORT || 8787;
 const OPS_TOKEN = process.env.OPS_TOKEN || null; // required for /ops routes
 const HOST = process.env.HOST || (process.env.RAILWAY_STATIC_URL ? '0.0.0.0' : '127.0.0.1');
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || null;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || null;
+const CREDITS_PER_DOLLAR = parseInt(process.env.CREDITS_PER_DOLLAR || '10', 10); // $10 pack = 100 calls
 
 // Test seam: inject stub collectors via COLLECTORS_MODULE (used by src/server.test.js).
 // In production this always resolves to the real ./collectors.
@@ -275,9 +278,84 @@ fastify.get('/ops/receipts', {
   return store.recentCalls.all(req.query.limit);
 });
 
+// --- Stripe billing webhook --------------------------------------------------
+// Payment Link carries client_reference_id=<api key> so a purchase maps to the
+// right business. On checkout.session.completed we credit:
+//   credits = amount_total (cents) / 100 * CREDITS_PER_DOLLAR
+// Idempotent: the Stripe event id is recorded; replays credit nothing.
+// Signature verification uses req.rawBody (instance-level rawBody: true).
+//
+// Setup (one-time, needs Stripe auth):
+//   1. STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET set in Railway vars
+//   2. Webhook endpoint: https://<host>/v1/billing/webhook
+//      events: checkout.session.completed
+//   3. Payment Link: line_items[0][price]=<price id>&client_reference_id
+//      is appended by the buy page as ?client_reference_id=<key>
+// NOTE: instance-level rawBody:true is broken in fastify 5.12.4 (rawBody never
+// populated). Instead we install a custom JSON parser that keeps the raw string
+// on req.rawBody for every application/json route. /ops body schemas still work
+// because we JSON.parse before calling done — req.body remains an object.
+fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, body, done) => {
+  req.rawBody = body; // exact bytes as received — required for Stripe HMAC
+  try { done(null, JSON.parse(body)); }
+  catch (e) { e.statusCode = 400; done(e, undefined); }
+});
+
+fastify.post('/v1/billing/webhook', {
+  schema: {
+    response: { 200: { type: 'object', properties: { received: { type: 'boolean' } } } },
+  },
+}, async (req, reply) => {
+  if (!STRIPE_SECRET_KEY || !STRIPE_WEBHOOK_SECRET) {
+    return reply.code(503).send({ error: 'billing disabled (Stripe env not set)' });
+  }
+
+  const stripe = require('stripe')(STRIPE_SECRET_KEY);
+
+  // Verify signature over the raw body
+  const sig = req.headers['stripe-signature'];
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, sig, STRIPE_WEBHOOK_SECRET);
+  } catch (e) {
+    req.log.warn({ err: e.message }, 'stripe signature verification failed');
+    return reply.code(400).send({ error: 'invalid signature' });
+  }
+
+  if (event.type !== 'checkout.session.completed') {
+    return { received: true }; // acknowledge other events without action
+  }
+
+  const session = event.data.object;
+  const apiKey = session.client_reference_id;
+  const eventId = event.id;
+
+  // Idempotency: never credit the same Stripe event twice
+  const seen = store.stripeEventSeen.get(eventId);
+  if (seen) return { received: true };
+  store.recordStripeEvent.run(eventId);
+
+  const biz = apiKey ? store.getBusinessByKey.get(apiKey) : null;
+  if (!biz) {
+    req.log.error({ eventId, client_reference_id: apiKey }, 'paid but no matching business key');
+    return { received: true }; // ack so Stripe stops retrying; reconcile manually
+  }
+
+  const dollars = (session.amount_total || 0) / 100;
+  const credits = Math.floor(dollars * CREDITS_PER_DOLLAR);
+  if (credits <= 0) {
+    req.log.error({ eventId, amount_total: session.amount_total }, 'unusable amount_total');
+    return { received: true };
+  }
+
+  store.addCredits.run(credits, biz.id);
+  req.log.info({ eventId, biz: biz.id, dollars, credits }, 'credits added via Stripe');
+  return { received: true };
+});
+
 const start = async () => {
   await fastify.listen({ port: PORT, host: HOST });
-  console.log(`404 Mentions API on :${PORT}${OPS_TOKEN ? ' (ops enabled)' : ' (ops DISABLED — set OPS_TOKEN)'}`);
+  console.log(`404 Mentions API on :${PORT}${OPS_TOKEN ? ' (ops enabled)' : ' (ops DISABLED — set OPS_TOKEN)'}${STRIPE_SECRET_KEY ? ' (billing enabled)' : ''}`);
 };
 
 module.exports = { fastify, store, authKey, rateLimited, start };

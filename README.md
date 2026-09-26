@@ -2,6 +2,10 @@
 
 One endpoint. Every agent. Social listening for any product — pay per call.
 
+**Live:** https://mentions-api-404-production.up.railway.app
+
+**Get a key / top up:** https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00 — $10 = 100 credits (append `?client_reference_id=<your_api_key>` so credits land on your key automatically).
+
 **What it does:** `GET /v1/mentions?product=<name>&days=90` returns total mentions, complaint count, and post samples from public sources (Hacker News via Algolia; Reddit ready to enable with an app credential).
 
 **Use when:** an agent needs to know what people said about a product/brand/topic over a time window — complaints, sentiment signals, post counts, sample links.

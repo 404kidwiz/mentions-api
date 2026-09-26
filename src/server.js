@@ -197,7 +197,7 @@ fastify.get('/v1/mentions', {
 // --- Operator endpoints (token-protected) -----------------------------------
 fastify.get('/ops/stats', { preHandler: requireOps }, async () => {
   const s = store.stats.get();
-  return { ...s, listed_in: ['skills.sh', 'agentskills.io', 'clawhub'] };
+  return { ...s, listed_in: [] }; // populated as registry listings go live
 });
 
 const createBusinessBody = {

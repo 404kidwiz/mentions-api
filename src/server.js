@@ -1,14 +1,21 @@
 // 404 Mentions API — one endpoint, every agent.
-// GET /v1/mentions?product=...&days=90   (header: Authorization: Bearer biz_...)
+// GET /v1/mentions?product=...&days=90   (header: Authorization: Bearer ***)
 // Rules: sandbox calls free (sample=true), errors never billed, daily caps enforced.
 // Billing is atomic: cap-check, debit, and receipt happen in one SQLite transaction
 // AFTER collection succeeds — no charge without a receipt, no unbilled success.
 const fastify = require('fastify')({ logger: true });
 const store = require('./db');
-const { collectMentions } = require('./collectors');
+const collectors = require('./collectors');
 
 const PORT = process.env.PORT || 8787;
 const OPS_TOKEN = process.env.OPS_TOKEN || null; // required for /ops routes
+const HOST = process.env.HOST || (process.env.RAILWAY_STATIC_URL ? '0.0.0.0' : '127.0.0.1');
+
+// Test seam: inject stub collectors via COLLECTORS_MODULE (used by src/server.test.js).
+// In production this always resolves to the real ./collectors.
+const collectMentions = process.env.COLLECTORS_MODULE
+  ? require(process.env.COLLECTORS_MODULE).collectMentions
+  : collectors.collectMentions;
 
 function authKey(req) {
   const h = req.headers['authorization'] || '';
@@ -17,7 +24,9 @@ function authKey(req) {
 }
 
 // --- Operator auth ---------------------------------------------------------
-function requireOps(req, reply) {
+// NOTE: must be async — in Fastify v5 a sync preHandler that neither calls
+// done() nor returns a Promise hangs the request lifecycle.
+async function requireOps(req, reply) {
   if (!OPS_TOKEN) return reply.code(503).send({ error: 'operator routes disabled (no OPS_TOKEN set)' });
   const got = authKey(req);
   if (got !== OPS_TOKEN) return reply.code(401).send({ error: 'invalid operator token' });
@@ -36,27 +45,90 @@ function rateLimited(id) {
   }
   return b.n > RATE.max;
 }
+// Sweep expired buckets every window so the map never lingers at low traffic.
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateBuckets) if (now - v.start > RATE.windowMs) rateBuckets.delete(k);
+}, RATE.windowMs).unref();
+
+// --- Schemas (JSON Schema; TypeBox optional for TS codebases) --------------
+const errorResponse = {
+  type: 'object',
+  properties: { error: { type: 'string' } },
+  required: ['error'],
+  additionalProperties: true, // hints pass through
+};
+
+const mentionsQuery = {
+  type: 'object',
+  properties: {
+    product: { type: 'string', minLength: 2, maxLength: 100 },
+    days: { type: 'integer', minimum: 1, maximum: 365, default: 90 },
+    sample: { type: 'string', enum: ['true', '1', 'false', '0'] },
+    agent: { type: 'string', maxLength: 50 },
+  },
+  required: ['product'],
+  additionalProperties: false,
+};
+
+const mentionItem = {
+  type: 'object',
+  properties: {
+    source: { type: 'string' },
+    title: { type: 'string' },
+    text: { type: 'string' },
+    created_utc: { type: 'number' },
+    url: { type: 'string' },
+    num_comments: { type: 'number' },
+    subreddit: { type: 'string' },
+    score: { type: 'number' },
+    points: { type: 'number' },
+  },
+  additionalProperties: true,
+};
+
+const mentionsResponse = {
+  type: 'object',
+  properties: {
+    product: { type: 'string' },
+    window: { type: 'string' },
+    total_mentions: { type: 'integer' },
+    complaints_flagged: { type: 'integer' },
+    sources: {
+      type: 'object',
+      properties: {
+        reddit: { type: ['integer', 'null'] },
+        hn: { type: ['integer', 'null'] },
+      },
+    },
+    truncated: { type: 'boolean' },
+    mentions: { type: 'array', items: mentionItem },
+    sample: { type: 'boolean' },
+    credits_remaining: { type: 'integer' },
+  },
+  required: ['product', 'window', 'total_mentions', 'complaints_flagged', 'mentions', 'sample'],
+};
 
 // --- Main endpoint ---------------------------------------------------------
-fastify.get('/v1/mentions', async (req, reply) => {
+fastify.get('/v1/mentions', {
+  schema: {
+    querystring: mentionsQuery,
+    response: {
+      200: mentionsResponse,
+      400: errorResponse,
+      401: errorResponse,
+      429: errorResponse,
+      502: errorResponse,
+    },
+  },
+}, async (req, reply) => {
   const started = Date.now();
-  const { product, days: daysRaw, sample, agent } = req.query;
-  const days = parseInt(daysRaw || '90', 10);
+  const { product, sample, agent } = req.query;
+  const days = req.query.days; // coerced integer by schema
   const isSandbox = sample === 'true' || sample === '1';
 
-  // Validate input types BEFORE any billing work (arrays from repeated params crash sqlite)
-  if (typeof product !== 'string' || product.length < 2) {
-    return reply.code(400).send({ error: 'missing product', hint: '?product=<name>&days=90' });
-  }
-  if (agent !== undefined && typeof agent !== 'string') {
-    return reply.code(400).send({ error: 'invalid agent param (repeat?)' });
-  }
-  if (isNaN(days) || days < 1 || days > 365) {
-    return reply.code(400).send({ error: 'window too long', hint: 'days must be 1-365' });
-  }
-
   const key = authKey(req);
-  if (!key) return reply.code(401).send({ error: 'missing key', hint: 'Authorization: Bearer biz_...' });
+  if (!key) return reply.code(401).send({ error: 'missing key', hint: 'Authorization: Bearer <key>' });
   const biz = store.getBusinessByKey.get(key);
   if (!biz) return reply.code(401).send({ error: 'invalid key' });
 
@@ -90,9 +162,9 @@ fastify.get('/v1/mentions', async (req, reply) => {
   // Bill atomically: cap-check + debit + receipt in ONE transaction.
   let billed, creditsLeft;
   if (!isSandbox) {
-    const res = store.billCall.transactionSafe(biz.id, biz.daily_cap, {
+    const res = store.billCall(biz.id, biz.daily_cap, {
       business_id: biz.id, agent: String(agent || 'unknown').slice(0, 50),
-      product: product.slice(0, 100), window: `${days}d`, source: 'live', status: '200',
+      product: product.slice(0, 100), window: `${days}d`, source: 'live', status: '200', billed: 1,
       posts: data.total, complaints: data.complaints, latency_ms: Date.now() - started,
     });
     if (res === 'CAP') return reply.code(429).send({ error: 'daily cap reached', cap: biz.daily_cap });
@@ -125,37 +197,89 @@ fastify.get('/ops/stats', { preHandler: requireOps }, async () => {
   return { ...s, listed_in: ['skills.sh', 'agentskills.io', 'clawhub'] };
 });
 
-fastify.post('/ops/businesses', { preHandler: requireOps }, async (req) => {
-  const { name, daily_cap, credits } = req.body || {};
-  if (typeof name !== 'string' || !name.trim()) throw { statusCode: 400, message: 'name required' };
-  const cap = daily_cap === undefined ? 500 : parseInt(daily_cap, 10);
-  const cred = credits === undefined ? 25 : parseInt(credits, 10);
-  if (isNaN(cap) || cap < 0 || cap > 1_000_000) throw { statusCode: 400, message: 'daily_cap must be 0-1000000' };
-  if (isNaN(cred) || cred < 0 || cred > 1_000_000) throw { statusCode: 400, message: 'credits must be 0-1000000' };
+const createBusinessBody = {
+  type: 'object',
+  properties: {
+    name: { type: 'string', minLength: 1, maxLength: 80 },
+    daily_cap: { type: 'integer', minimum: 0, maximum: 1_000_000, default: 500 },
+    credits: { type: 'integer', minimum: 0, maximum: 1_000_000, default: 25 },
+  },
+  required: ['name'],
+  additionalProperties: false,
+};
+
+fastify.post('/ops/businesses', {
+  preHandler: requireOps,
+  schema: {
+    body: createBusinessBody,
+    response: {
+      200: {
+        type: 'object',
+        properties: {
+          id: { type: 'integer' },
+          key: { type: 'string' },
+          name: { type: 'string' },
+          daily_cap: { type: 'integer' },
+          credits: { type: 'integer' },
+        },
+      },
+    },
+  },
+}, async (req) => {
+  const { name, daily_cap: cap, credits: cred } = req.body; // schema-coerced w/ defaults
   const key = store.newKey();
   const info = store.createBusiness.run(key, name.slice(0, 80), cap, cred);
-  return { id: info.lastInsertRowid, key, name: name.slice(0, 80), daily_cap: cap, credits: cred }; // key shown ONCE at creation
+  return { id: Number(info.lastInsertRowid), key, name: name.slice(0, 80), daily_cap: cap, credits: cred }; // key shown ONCE at creation
 });
 
-fastify.post('/ops/businesses/:id/credits', { preHandler: requireOps }, async (req) => {
-  const { amount } = req.body || {};
-  const n = parseInt(amount, 10);
-  if (isNaN(n) || n <= 0 || n > 1_000_000) throw { statusCode: 400, message: 'amount must be 1-1000000' };
+fastify.post('/ops/businesses/:id/credits', {
+  preHandler: requireOps,
+  schema: {
+    params: {
+      type: 'object',
+      properties: { id: { type: 'integer', minimum: 1 } },
+      required: ['id'],
+    },
+    body: {
+      type: 'object',
+      properties: { amount: { type: 'integer', minimum: 1, maximum: 1_000_000 } },
+      required: ['amount'],
+      additionalProperties: false,
+    },
+    response: {
+      200: {
+        type: 'object',
+        properties: { id: { type: 'integer' }, name: { type: 'string' }, credits: { type: 'integer' } },
+      },
+      404: errorResponse,
+    },
+  },
+}, async (req) => {
   const b = store.getBusiness.get(req.params.id);
   if (!b) throw { statusCode: 404, message: 'business not found' };
-  store.addCredits.run(n, req.params.id);
+  store.addCredits.run(req.body.amount, req.params.id);
   const after = store.getBusiness.get(req.params.id);
   return { id: after.id, name: after.name, credits: after.credits }; // no key echo
 });
 
-fastify.get('/ops/receipts', { preHandler: requireOps }, async (req) => {
-  const n = parseInt(req.query.limit || '25', 10);
-  if (isNaN(n) || n < 1 || n > 100) throw { statusCode: 400, message: 'limit must be 1-100' };
-  return store.recentCalls.all(n);
+fastify.get('/ops/receipts', {
+  preHandler: requireOps,
+  schema: {
+    querystring: {
+      type: 'object',
+      properties: { limit: { type: 'integer', minimum: 1, maximum: 100, default: 25 } },
+      additionalProperties: false,
+    },
+  },
+}, async (req) => {
+  return store.recentCalls.all(req.query.limit);
 });
 
 const start = async () => {
-  await fastify.listen({ port: PORT, host: process.env.RAILWAY_STATIC_URL ? '0.0.0.0' : '127.0.0.1' });
+  await fastify.listen({ port: PORT, host: HOST });
   console.log(`404 Mentions API on :${PORT}${OPS_TOKEN ? ' (ops enabled)' : ' (ops DISABLED — set OPS_TOKEN)'}`);
 };
-start();
+
+module.exports = { fastify, store, authKey, rateLimited, start };
+
+if (require.main === module) start();

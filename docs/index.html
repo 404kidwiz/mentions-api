@@ -7,13 +7,13 @@
 <meta name="description" content="One endpoint. Every mention of your product on Hacker News and Reddit. Pay per call. Built for AI agents.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0b0c0e; --panel:#101114; --panel2:#141518; --line:#232529; --line2:#2e3136;
-  --text:#e6e7ea; --dim:#8b8f97; --faint:#5c6068;
+  --text:#e6e7ea; --dim:#8b8f97; --faint:#7d828c;
   --green:#4ade80; --amber:#fbbf24; --red:#f87171; --blue:#60a5fa;
-  --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Inter',-apple-system,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Instrument Sans',-apple-system,sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
@@ -26,7 +26,7 @@ a{color:inherit}
 nav{position:sticky;top:0;z-index:50;background:rgba(11,12,14,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px}
 .logo{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px;text-decoration:none}
-.logo .sq{width:18px;height:18px;border-radius:4px;background:var(--green);display:inline-flex;align-items:center;justify-content:center;color:#0b0c0e;font-size:11px;font-weight:800}
+.logo .sq{width:18px;height:18px;border-radius:4px;background:var(--green);display:inline-flex;align-items:center;justify-content:center;color:#0b0c0e;font-size:11px;font-weight:700}
 nav .links{display:flex;gap:22px;font-size:13.5px;color:var(--dim)}
 nav .links a{text-decoration:none}
 nav .links a:hover{color:var(--text)}
@@ -35,10 +35,7 @@ nav .buy:hover{background:#4ade8014;border-color:#4ade8088}
 
 /* ---------- hero ---------- */
 .hero{padding:84px 0 56px;display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center}
-.kicker{font-family:var(--mono);font-size:12px;color:var(--green);letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
-.kicker::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.2s infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #4ade8055}50%{box-shadow:0 0 0 6px #4ade8000}}
-h1{font-size:clamp(34px,4.6vw,52px);font-weight:800;letter-spacing:-.035em;line-height:1.06;margin:18px 0 16px}
+h1{font-size:clamp(34px,4.6vw,52px);font-weight:700;letter-spacing:-.035em;line-height:1.06;margin:18px 0 16px}
 h1 em{font-style:normal;color:var(--green)}
 .lede{color:var(--dim);font-size:17px;max-width:46ch}
 .hero-ctas{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
@@ -50,7 +47,7 @@ h1 em{font-style:normal;color:var(--green)}
 .hero-meta b{color:var(--dim);font-weight:500}
 
 /* ---------- terminal ---------- */
-.term{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px -30px rgba(0,0,0,.7)}
+.term{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 18px 44px -22px rgba(0,0,0,.65)}
 .term-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
 .dot{width:11px;height:11px;border-radius:50%}
 .d1{background:#ff5f57}.d2{background:#febc2e}.d3{background:#28c840}
@@ -62,8 +59,8 @@ h1 em{font-style:normal;color:var(--green)}
 
 /* ---------- sections ---------- */
 section{padding:64px 0;border-top:1px solid var(--line)}
-.sec-tag{font-family:var(--mono);font-size:12px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase}
-h2{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.03em;margin:10px 0 8px}
+.sec-tag{font-family:var(--mono);font-size:12.5px;color:var(--dim);letter-spacing:.02em}
+h2{font-size:clamp(24px,3vw,32px);font-weight:700;letter-spacing:-.03em;margin:10px 0 8px}
 .sec-sub{color:var(--dim);max-width:56ch;font-size:16px}
 
 /* ---------- bento ---------- */
@@ -73,7 +70,7 @@ h2{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.03em;margin:1
 .c-4{grid-column:span 4}.c-3{grid-column:span 3}.c-2{grid-column:span 2}
 .cell h3{font-size:15.5px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:9px}
 .cell p{color:var(--dim);font-size:14px}
-.chip{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:5px;background:#4ade8018;color:var(--green);border:1px solid #4ade8033}
+.chip{font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:5px;background:#4ade8018;color:var(--green);border:1px solid #4ade8033}
 .chip.a{background:#fbbf2418;color:var(--amber);border-color:#fbbf2433}
 .chip.b{background:#60a5fa18;color:var(--blue);border-color:#60a5fa33}
 .cell .big{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.02em;margin:6px 0 2px}
@@ -140,9 +137,8 @@ footer a:hover{color:var(--text)}
 
 <header class="hero wrap">
   <div>
-    <div class="kicker">One endpoint · built for agents</div>
     <h1>Know every time your product gets <em>mentioned</em>.</h1>
-    <p class="lede">404 Mentions scans Hacker News and Reddit for any product, domain, or brand — and returns the chatter as clean JSON. One call. No scraping, no SDK, no dashboards.</p>
+    <p class="lede">404 Mentions scans Hacker News and Reddit for any product, domain, or brand, and returns the chatter as clean JSON. One call, no scraping, no SDK, no dashboards.</p>
     <div class="hero-ctas">
       <a class="btn-p" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Get 100 credits — $10</a>
       <a class="btn-s" href="#how">Read the docs ↓</a>
@@ -171,7 +167,7 @@ footer a:hover{color:var(--text)}
     <div class="steps">
       <div class="step">
         <div><h3>Buy credits — get a key instantly</h3>
-        <p>Pay $10 via Stripe. The API key appears on your success page the second payment clears — auto-issued, no signup, no email waitlist. Credits never expire.</p></div>
+        <p>Pay $10 via Stripe. Your API key appears on your success page the second payment clears: auto-issued, no signup, no email waitlist. Credits never expire.</p></div>
       </div>
       <div class="step">
         <div><h3>Call the endpoint</h3>
@@ -179,7 +175,7 @@ footer a:hover{color:var(--text)}
       </div>
       <div class="step">
         <div><h3>Read the signal</h3>
-        <p>Back comes total mentions, complaint count, and post samples with source, score, and permalink — enough for an agent to summarize sentiment or feed your growth loop.</p></div>
+        <p>Back comes total mentions, complaint count, and post samples with source, score, and permalink: enough for an agent to summarize sentiment or feed your growth loop.</p></div>
       </div>
     </div>
   </div>
@@ -192,7 +188,7 @@ footer a:hover{color:var(--text)}
     <div class="bento">
       <div class="cell c-4">
         <h3>Live terminal demo <span class="chip">runs above</span></h3>
-        <p>The hero terminal replays a real call: 24 genuine HN mentions for <code>linear.app</code> in 7 days, 3 complaint-flagged. That's the actual payload shape agents receive.</p>
+        <p>The hero terminal replays a real call: 24 genuine HN mentions for <code>linear.app</code> in 7 days (3 complaint-flagged). That's the actual payload shape agents receive.</p>
         <div class="spark" aria-hidden="true"></div>
       </div>
       <div class="cell c-2">
@@ -216,7 +212,7 @@ footer a:hover{color:var(--text)}
       </div>
       <div class="cell c-3">
         <h3>Partial-failure safe <span class="chip a">by design</span></h3>
-        <p>A blocked source degrades to <code>partial_failure</code> with the rest of the data intact — your agent gets an answer, not an exception. Never billed for what failed.</p>
+        <p>A blocked source degrades to <code>partial_failure</code> with the rest of the data intact: your agent gets an answer, not an exception. Never billed for what failed.</p>
       </div>
     </div>
   </div>
@@ -226,18 +222,19 @@ footer a:hover{color:var(--text)}
   <div class="wrap">
     <div class="sec-tag">Pricing</div>
     <h2>Credits, not subscriptions</h2>
-    <p class="sec-sub">One rate. No tiers, no seats, no monthly minimum. A credit is one successful live query.</p>
+    <p class="sec-sub">A credit is one successful live query. There are no tiers, seats, or monthly minimums, and failed calls cost nothing.</p>
     <div class="pricing">
       <div class="price-card hot">
         <div class="amt">$10 <small>one-time</small></div>
         <ul>
-          <li>100 live lookups (10 per $)</li>
+          <li>100 live lookups at $0.10 each</li>
           <li>API key issued on payment</li>
           <li>Unlimited free sandbox calls</li>
           <li>Credits never expire</li>
           <li>1–365 day windows</li>
         </ul>
-        <a class="btn-p" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Buy via Stripe</a>
+        <a class="btn-p" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Buy 100 credits — $10</a>
+        <div class="mono-note">One-time payment. No subscription. No recurring charges.</div>
         <div class="mono-note">have a key? add ?client_reference_id=YOUR_KEY to top up</div>
       </div>
       <div class="price-card">
@@ -250,7 +247,7 @@ footer a:hover{color:var(--text)}
           <li>Great for agent eval harnesses</li>
         </ul>
         <a class="btn-s" href="#term">Try the demo ↑</a>
-        <div class="mono-note">just append &amp;sample=true</div>
+        <div class="mono-note">No card. No signup. Just append &amp;sample=true</div>
       </div>
     </div>
 
@@ -263,7 +260,7 @@ footer a:hover{color:var(--text)}
 
 <footer>
   <div class="wrap">
-    <span>404 Technologies — built by <a href="https://x.com/404kidwiz">@404kidwiz</a></span>
+    <span>404 Technologies · built by <a href="https://x.com/404kidwiz">@404kidwiz</a></span>
     <span><a href="https://github.com/404kidwiz/mentions-api">source &amp; docs</a> · <a href="https://skills.sh/404kidwiz/mentions-api">skills.sh</a> · <a href="https://mentions-api-404-production.up.railway.app/v1/mentions?product=linear.app&days=7&sample=true">live sandbox</a></span>
   </div>
 </footer>

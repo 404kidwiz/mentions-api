@@ -3,87 +3,354 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>404 Mentions API — Social listening for AI agents</title>
-<meta name="description" content="One endpoint. Every agent. Track where any product is mentioned across Hacker News and Reddit. Pay per call.">
+<title>404 Mentions — Social listening for AI agents</title>
+<meta name="description" content="One endpoint. Every mention of your product on Hacker News and Reddit. Pay per call. Built for AI agents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0a0a0f; --card:#12121a; --accent:#7c5cff; --accent2:#00d4aa; --text:#e8e8f0; --muted:#9494a8; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; line-height:1.6; }
-  .wrap { max-width:880px; margin:0 auto; padding:0 24px; }
-  header { padding:80px 0 40px; text-align:center; }
-  .badge { display:inline-block; background:rgba(124,92,255,.15); color:var(--accent); border:1px solid rgba(124,92,255,.4); padding:4px 14px; border-radius:99px; font-size:13px; font-weight:600; letter-spacing:.5px; }
-  h1 { font-size:clamp(36px,6vw,56px); font-weight:800; margin:20px 0 12px; letter-spacing:-1px; }
-  h1 span { background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .sub { color:var(--muted); font-size:19px; max-width:600px; margin:0 auto; }
-  .ctas { margin-top:32px; display:flex; gap:14px; justify-content:center; flex-wrap:wrap; }
-  .btn { display:inline-block; padding:14px 28px; border-radius:12px; font-weight:700; font-size:16px; text-decoration:none; transition:transform .15s; }
-  .btn:hover { transform:translateY(-2px); }
-  .btn-primary { background:linear-gradient(90deg,var(--accent),#9d7bff); color:#fff; }
-  .btn-ghost { border:1px solid #333; color:var(--text); }
-  section { padding:40px 0; }
-  h2 { font-size:26px; margin-bottom:20px; letter-spacing:-.5px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
-  .card { background:var(--card); border:1px solid #1e1e2e; border-radius:14px; padding:24px; }
-  .card h3 { font-size:17px; margin-bottom:8px; color:var(--accent2); }
-  .card p { color:var(--muted); font-size:15px; }
-  pre { background:#0d0d14; border:1px solid #1e1e2e; border-radius:12px; padding:20px; overflow-x:auto; font-size:14px; color:#c8c8dc; }
-  .k { color:var(--accent); } .s { color:var(--accent2); }
-  .price { text-align:center; padding:50px 0; }
-  .price .amount { font-size:48px; font-weight:800; }
-  .price .per { color:var(--muted); }
-  footer { border-top:1px solid #1e1e2e; margin-top:40px; padding:30px 0; color:var(--muted); font-size:14px; text-align:center; }
-  footer a { color:var(--accent); text-decoration:none; }
+:root{
+  --bg:#0b0c0e; --panel:#101114; --panel2:#141518; --line:#232529; --line2:#2e3136;
+  --text:#e6e7ea; --dim:#8b8f97; --faint:#5c6068;
+  --green:#4ade80; --amber:#fbbf24; --red:#f87171; --blue:#60a5fa;
+  --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Inter',-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased}
+::selection{background:#4ade8033}
+.wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+a{color:inherit}
+
+/* ---------- nav ---------- */
+nav{position:sticky;top:0;z-index:50;background:rgba(11,12,14,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;height:56px}
+.logo{font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:-.02em;display:flex;align-items:center;gap:10px;text-decoration:none}
+.logo .sq{width:18px;height:18px;border-radius:4px;background:var(--green);display:inline-flex;align-items:center;justify-content:center;color:#0b0c0e;font-size:11px;font-weight:800}
+nav .links{display:flex;gap:22px;font-size:13.5px;color:var(--dim)}
+nav .links a{text-decoration:none}
+nav .links a:hover{color:var(--text)}
+nav .buy{font-family:var(--mono);font-size:12.5px;color:var(--green);text-decoration:none;border:1px solid #4ade8044;padding:6px 12px;border-radius:7px}
+nav .buy:hover{background:#4ade8014;border-color:#4ade8088}
+
+/* ---------- hero ---------- */
+.hero{padding:84px 0 56px;display:grid;grid-template-columns:1fr 1.15fr;gap:48px;align-items:center}
+.kicker{font-family:var(--mono);font-size:12px;color:var(--green);letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.kicker::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 #4ade8055}50%{box-shadow:0 0 0 6px #4ade8000}}
+h1{font-size:clamp(34px,4.6vw,52px);font-weight:800;letter-spacing:-.035em;line-height:1.06;margin:18px 0 16px}
+h1 em{font-style:normal;color:var(--green)}
+.lede{color:var(--dim);font-size:17px;max-width:46ch}
+.hero-ctas{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+.btn-p{background:var(--green);color:#0b0c0e;font-weight:700;font-size:15px;padding:13px 22px;border-radius:9px;text-decoration:none;font-family:var(--mono)}
+.btn-p:hover{background:#6ee7a0}
+.btn-s{border:1px solid var(--line2);color:var(--text);font-size:15px;padding:13px 22px;border-radius:9px;text-decoration:none;font-family:var(--mono)}
+.btn-s:hover{border-color:var(--faint)}
+.hero-meta{margin-top:26px;font-family:var(--mono);font-size:12px;color:var(--faint);display:flex;gap:18px;flex-wrap:wrap}
+.hero-meta b{color:var(--dim);font-weight:500}
+
+/* ---------- terminal ---------- */
+.term{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 70px -30px rgba(0,0,0,.7)}
+.term-bar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.dot{width:11px;height:11px;border-radius:50%}
+.d1{background:#ff5f57}.d2{background:#febc2e}.d3{background:#28c840}
+.term-title{margin:0 auto;font-family:var(--mono);font-size:11.5px;color:var(--faint);transform:translateX(-24px)}
+.term-body{font-family:var(--mono);font-size:13px;line-height:1.75;padding:18px 18px 20px;min-height:318px;white-space:pre-wrap;word-break:break-all}
+.t-p{color:var(--faint)} .t-c{color:var(--text)} .t-g{color:var(--green)} .t-a{color:var(--amber)} .t-b{color:var(--blue)} .t-r{color:var(--red)} .t-d{color:var(--dim)}
+.cursor{display:inline-block;width:8px;height:16px;background:var(--green);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+
+/* ---------- sections ---------- */
+section{padding:64px 0;border-top:1px solid var(--line)}
+.sec-tag{font-family:var(--mono);font-size:12px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase}
+h2{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.03em;margin:10px 0 8px}
+.sec-sub{color:var(--dim);max-width:56ch;font-size:16px}
+
+/* ---------- bento ---------- */
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-top:34px}
+.cell{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px;position:relative;overflow:hidden;transition:border-color .25s}
+.cell:hover{border-color:var(--line2)}
+.c-4{grid-column:span 4}.c-3{grid-column:span 3}.c-2{grid-column:span 2}
+.cell h3{font-size:15.5px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:9px}
+.cell p{color:var(--dim);font-size:14px}
+.chip{font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:5px;background:#4ade8018;color:var(--green);border:1px solid #4ade8033}
+.chip.a{background:#fbbf2418;color:var(--amber);border-color:#fbbf2433}
+.chip.b{background:#60a5fa18;color:var(--blue);border-color:#60a5fa33}
+.cell .big{font-family:var(--mono);font-weight:700;font-size:34px;letter-spacing:-.02em;margin:6px 0 2px}
+.cell .big small{font-size:14px;color:var(--faint);font-weight:400}
+.spark{display:flex;align-items:flex-end;gap:3px;height:56px;margin-top:14px}
+.spark i{flex:1;background:#4ade8033;border-radius:2px 2px 0 0;animation:grow 1s cubic-bezier(.16,1,.3,1) both}
+.spark i:nth-child(odd){background:#4ade8022}
+@keyframes grow{from{height:4px;opacity:.3}}
+code{font-family:var(--mono);font-size:.92em;background:#ffffff0d;border:1px solid var(--line);padding:1px 6px;border-radius:5px}
+
+/* ---------- how ---------- */
+.steps{counter-reset:s;margin-top:34px;display:grid;gap:0}
+.step{display:grid;grid-template-columns:52px 1fr;gap:18px;padding:22px 0;border-top:1px solid var(--line)}
+.step:first-child{border-top:0}
+.step::before{counter-increment:s;content:"0" counter(s);font-family:var(--mono);font-size:13px;color:var(--green);padding-top:3px}
+.step h3{font-size:16px;font-weight:600;margin-bottom:4px}
+.step p{color:var(--dim);font-size:14.5px;max-width:62ch}
+
+/* ---------- pricing ---------- */
+.pricing{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:34px}
+.price-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:30px}
+.price-card.hot{border-color:#4ade8055;background:linear-gradient(180deg,#4ade800a,var(--panel))}
+.price-card .amt{font-family:var(--mono);font-size:44px;font-weight:700;letter-spacing:-.03em}
+.price-card .amt small{font-size:15px;color:var(--dim);font-weight:400}
+.price-card ul{list-style:none;margin:18px 0 24px;display:grid;gap:9px}
+.price-card li{color:var(--dim);font-size:14.5px;display:flex;gap:10px}
+.price-card li::before{content:"→";color:var(--green);font-family:var(--mono)}
+.price-card .btn-p,.price-card .btn-s{display:block;text-align:center}
+.mono-note{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--faint);text-align:center}
+
+/* ---------- install ---------- */
+.install{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-top:34px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.install .cmd{font-family:var(--mono);font-size:14px;color:var(--green)}
+.copy{font-family:var(--mono);font-size:12px;color:var(--dim);background:none;border:1px solid var(--line2);padding:7px 14px;border-radius:7px;cursor:pointer}
+.copy:hover{color:var(--text);border-color:var(--faint)}
+
+footer{border-top:1px solid var(--line);padding:34px 0;color:var(--faint);font-size:13.5px}
+footer .wrap{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap}
+footer a{color:var(--dim);text-decoration:none}
+footer a:hover{color:var(--text)}
+
+@media(max-width:860px){
+  .hero{grid-template-columns:1fr;padding-top:56px}
+  .pricing{grid-template-columns:1fr}
+  .c-4,.c-3,.c-2{grid-column:span 6}
+  nav .links{display:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <span class="badge">API ★ BUILT FOR AI AGENTS</span>
-    <h1>Who's talking about <span>your product</span>?</h1>
-    <p class="sub">One endpoint returns every recent mention of any product across Hacker News and Reddit — counts, complaint signals, and post samples. Pay per call.</p>
-    <div class="ctas">
-      <a class="btn btn-primary" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Get 100 credits — $10</a>
-      <a class="btn btn-ghost" href="#try">Try it free →</a>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#"><span class="sq">4</span>404<span style="color:var(--faint)">/</span>MENTIONS</a>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="https://github.com/404kidwiz/mentions-api">GitHub</a>
     </div>
-  </header>
+    <a class="buy" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">$10 → 100 credits</a>
+  </div>
+</nav>
 
-  <section id="try">
-    <h2>One request. That's the whole API.</h2>
-    <pre>curl "<span class="s">https://mentions-api-404-production.up.railway.app/v1/mentions</span>?product=linear.app&amp;days=30" \
-  -H "Authorization: Bearer <span class="k">YOUR_API_KEY</span>"
-
-{
-  <span class="k">"product"</span>: "linear.app",
-  <span class="k">"days"</span>: 30,
-  <span class="k">"total_mentions"</span>: 24,
-  <span class="k">"complaints"</span>: 3,
-  <span class="k">"posts"</span>: [ { <span class="k">"source"</span>: "hn", <span class="k">"title"</span>: "...", <span class="k">"url"</span>: "...", <span class="k">"score"</span>: 142 } ],
-  <span class="k">"credits_remaining"</span>: 99
-}</pre>
-    <p style="color:var(--muted);margin-top:12px;font-size:15px">Add <code>&amp;sample=true</code> for a free preview — 5 posts, never billed.</p>
-  </section>
-
-  <section>
-    <h2>Why agents use it</h2>
-    <div class="grid">
-      <div class="card"><h3>⚡ One call</h3><p>No scraping, no SDKs, no setup. Any agent hits one endpoint and gets structured mention data back.</p></div>
-      <div class="card"><h3>🧪 Free sandbox</h3><p>Preview results with <code>sample=true</code> — zero credits, zero risk. Errors are never billed.</p></div>
-      <div class="card"><h3>🔒 Honest billing</h3><p>1 credit per live call, atomic daily caps, idempotent Stripe-verified top-ups. No surprises.</p></div>
-      <div class="card"><h3>🤖 Agent-native</h3><p>Ships as an installable skill for Claude, Codex, and OpenClaw agents. They just know how to use it.</p></div>
+<header class="hero wrap">
+  <div>
+    <div class="kicker">One endpoint · built for agents</div>
+    <h1>Know every time your product gets <em>mentioned</em>.</h1>
+    <p class="lede">404 Mentions scans Hacker News and Reddit for any product, domain, or brand — and returns the chatter as clean JSON. One call. No scraping, no SDK, no dashboards.</p>
+    <div class="hero-ctas">
+      <a class="btn-p" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Get 100 credits — $10</a>
+      <a class="btn-s" href="#how">Read the docs ↓</a>
     </div>
-  </section>
+    <div class="hero-meta">
+      <span><b>GET</b> /v1/mentions</span>
+      <span><b>1 credit</b> per live call</span>
+      <span><b>sample=true</b> always free</span>
+    </div>
+  </div>
 
-  <section class="price">
-    <h2>Simple pricing</h2>
-    <p><span class="amount">$10</span> <span class="per">= 100 live lookups</span></p>
-    <p style="color:var(--muted);margin:8px 0 24px">Credits never expire. Sandbox calls always free.</p>
-    <a class="btn btn-primary" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Buy credits via Stripe</a>
-    <p style="color:var(--muted);font-size:14px;margin-top:14px">Have an API key? Append <code>?client_reference_id=YOUR_KEY</code> to the buy link and credits land on it automatically.</p>
-  </section>
+  <div class="term" id="term">
+    <div class="term-bar">
+      <span class="dot d1"></span><span class="dot d2"></span><span class="dot d3"></span>
+      <span class="term-title">wiz@mbp — mentions</span>
+    </div>
+    <div class="term-body" id="termBody"></div>
+  </div>
+</header>
 
-  <footer>
-    Built by <a href="https://x.com/404kidwiz">404 Technologies</a> · Docs + source on <a href="https://github.com/404kidwiz/mentions-api">GitHub</a> · Install the skill: <code>npx skills add 404kidwiz/mentions-api</code>
-  </footer>
-</div>
+<section id="how">
+  <div class="wrap">
+    <div class="sec-tag">How it works</div>
+    <h2>Ship your first mention query in 60 seconds</h2>
+    <p class="sec-sub">It's a single GET request with a bearer key. Your agent probably doesn't even need instructions.</p>
+    <div class="steps">
+      <div class="step">
+        <div><h3>Buy credits — get a key instantly</h3>
+        <p>Pay $10 via Stripe. The API key appears on your success page the second payment clears — auto-issued, no signup, no email waitlist. Credits never expire.</p></div>
+      </div>
+      <div class="step">
+        <div><h3>Call the endpoint</h3>
+        <p><code>GET /v1/mentions?product=linear.app&amp;days=30</code> with <code>Authorization: Bearer biz_…</code>. Window from 1 to 365 days. Add <code>&amp;sample=true</code> to preview free.</p></div>
+      </div>
+      <div class="step">
+        <div><h3>Read the signal</h3>
+        <p>Back comes total mentions, complaint count, and post samples with source, score, and permalink — enough for an agent to summarize sentiment or feed your growth loop.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-tag">Features</div>
+    <h2>Small API. Sharp edges only.</h2>
+    <div class="bento">
+      <div class="cell c-4">
+        <h3>Live terminal demo <span class="chip">runs above</span></h3>
+        <p>The hero terminal replays a real call: 24 genuine HN mentions for <code>linear.app</code> in 7 days, 3 complaint-flagged. That's the actual payload shape agents receive.</p>
+        <div class="spark" aria-hidden="true"></div>
+      </div>
+      <div class="cell c-2">
+        <h3>Honest billing</h3>
+        <div class="big">1<small> credit / call</small></div>
+        <p>Atomic debit + receipt in one transaction. Errors never bill. Daily caps protect you from agent loops.</p>
+      </div>
+      <div class="cell c-2">
+        <h3>Instant key issuance</h3>
+        <div class="big">0s<small> to first call</span></div>
+        <p>Pay → key appears → start calling. Stripe-verified webhooks with idempotency; top-ups credit atomically.</p>
+      </div>
+      <div class="cell c-2">
+        <h3>Free sandbox</h3>
+        <div class="big">$0<small> forever</small></div>
+        <p><code>sample=true</code> returns real preview data and never touches your credit balance.</p>
+      </div>
+      <div class="cell c-3">
+        <h3>Agent-native distribution <span class="chip b">skills</span></h3>
+        <p>Ships as an installable agent skill — your Claude, Codex, or OpenClaw agent learns the endpoint and billing rules on install, then just uses it.</p>
+      </div>
+      <div class="cell c-3">
+        <h3>Partial-failure safe <span class="chip a">by design</span></h3>
+        <p>A blocked source degrades to <code>partial_failure</code> with the rest of the data intact — your agent gets an answer, not an exception. Never billed for what failed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-tag">Pricing</div>
+    <h2>Credits, not subscriptions</h2>
+    <p class="sec-sub">One rate. No tiers, no seats, no monthly minimum. A credit is one successful live query.</p>
+    <div class="pricing">
+      <div class="price-card hot">
+        <div class="amt">$10 <small>one-time</small></div>
+        <ul>
+          <li>100 live lookups (10 per $)</li>
+          <li>API key issued on payment</li>
+          <li>Unlimited free sandbox calls</li>
+          <li>Credits never expire</li>
+          <li>1–365 day windows</li>
+        </ul>
+        <a class="btn-p" href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00">Buy via Stripe</a>
+        <div class="mono-note">have a key? add ?client_reference_id=YOUR_KEY to top up</div>
+      </div>
+      <div class="price-card">
+        <div class="amt">$0 <small>sandbox</small></div>
+        <ul>
+          <li>Every endpoint parameter available</li>
+          <li>Real preview posts (5 samples)</li>
+          <li>No key billing — ever</li>
+          <li>Same JSON shape as live</li>
+          <li>Great for agent eval harnesses</li>
+        </ul>
+        <a class="btn-s" href="#term">Try the demo ↑</a>
+        <div class="mono-note">just append &amp;sample=true</div>
+      </div>
+    </div>
+
+    <div class="install">
+      <span class="cmd" id="installCmd">npx skills add 404kidwiz/mentions-api</span>
+      <button class="copy" id="copyBtn" onclick="copyInstall()">copy install</button>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>404 Technologies — built by <a href="https://x.com/404kidwiz">@404kidwiz</a></span>
+    <span><a href="https://github.com/404kidwiz/mentions-api">source &amp; docs</a> · <a href="https://skills.sh/404kidwiz/mentions-api">skills.sh</a> · <a href="https://mentions-api-404-production.up.railway.app/v1/mentions?product=linear.app&days=7&sample=true">live sandbox</a></span>
+  </div>
+</footer>
+
+<script>
+/* ---- hero terminal: sequenced typing (pattern from 21st.dev dillionverma/terminal, vanilla port) ---- */
+const body = document.getElementById('termBody');
+const LINES = [
+  {t:'p', s:'# ask about any product'},
+  {t:'c', s:'curl "…/v1/mentions?product=linear.app&days=7" \\'},
+  {t:'c', s:'  -H "Authorization: Bearer biz_…"', pause:500},
+  {t:'o', s:''},
+  {t:'j', s:''},
+];
+const RESP = [
+  ['{'],
+  ['  "product": "linear.app",'],
+  ['  "days": 7,'],
+  ['  "total_mentions": 24,'],
+  ['  "complaints": 3,'],
+  ['  "sources": { "hn": 24, "reddit": null },'],
+  ['  "posts": ['],
+  ['    { "source": "hn", "score": 142,'],
+  ['      "title": "Why we switched to Linear…",'],
+  ['      "url": "news.ycombinator.com/item?id=…" },'],
+  ['    … 23 more'],
+  ['  ],'],
+  ['  "credits_remaining": 99'],
+  ['}'],
+];
+const cls = {p:'t-p', c:'t-c', o:'t-d', j:'t-j'};
+function span(clsName, text){ const s=document.createElement('span'); s.className=clsName; s.textContent=text; return s; }
+function line(clsName, text){ const d=document.createElement('div'); d.appendChild(span(clsName,text)); return d; }
+const cursor = document.createElement('span'); cursor.className='cursor';
+
+async function type(el, text, speed=26){
+  el.insertBefore(cursor, null);
+  for(const ch of text){
+    cursor.before(document.createTextNode(ch));
+    await new Promise(r=>setTimeout(r, speed + Math.random()*30));
+  }
+  cursor.remove();
+}
+async function run(){
+  while(true){
+    body.innerHTML='';
+    // prompt lines
+    for(const l of LINES){
+      if(l.t==='p'){ const d=line('t-p',''); d.appendChild(span('t-g','$ ')); body.appendChild(d); await type(d, l.s, 18); }
+      else if(l.t==='c'){ const d=line('t-c',''); body.appendChild(d); await type(d, l.s, 22); }
+      else if(l.t==='o'){ const d=line('t-d',''); body.appendChild(d); await new Promise(r=>setTimeout(r,300)); }
+      else { // JSON response block
+        for(const [raw] of RESP){
+          const indented = raw;
+          let clsName='t-j';
+          // colorize keys/values lightly
+          const d=document.createElement('div'); d.className='t-j';
+          const m = raw.match(/^(\s*)"([^"]+)":\s?(.*)$/);
+          if(m){ d.appendChild(span('t-b', m[1]+'"'+m[2]+'"')); d.appendChild(span('t-d',': ')); d.appendChild(span('t-g', m[3])); }
+          else if(/^\{|\}|[|\]]/.test(raw)) { d.appendChild(span('t-d', raw)); }
+          else { d.appendChild(span('t-j', raw)); }
+          body.appendChild(d);
+          await new Promise(r=>setTimeout(r, 70));
+        }
+      }
+      if(l.pause) await new Promise(r=>setTimeout(r, l.pause));
+    }
+    await new Promise(r=>setTimeout(r, 4200)); // hold, then loop
+  }
+}
+// style for json lines
+const st=document.createElement('style');
+st.textContent='.t-j{color:#c9cdd4} .t-j .num{color:var(--amber)}';
+document.head.appendChild(st);
+run();
+
+/* ---- spark bars (bento cell) ---- */
+const spark=document.querySelector('.spark');
+if(spark){ const heights=[34,52,28,66,44,78,38,58,88,48,70,60];
+  heights.forEach((h,i)=>{const b=document.createElement('i'); b.style.height=h+'%'; b.style.animationDelay=(i*60)+'ms'; spark.appendChild(b);}); }
+
+/* ---- copy install ---- */
+function copyInstall(){
+  const b=document.getElementById('copyBtn');
+  navigator.clipboard.writeText(document.getElementById('installCmd').textContent.trim());
+  b.textContent='copied ✓'; setTimeout(()=>b.textContent='copy install',1600);
+}
+</script>
 </body>
 </html>

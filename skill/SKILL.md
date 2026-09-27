@@ -2,7 +2,7 @@
 name: mentions-api
 description: Track where a product is mentioned across Reddit and Hacker News via the 404 Mentions API. Use when the user asks "who's talking about X", "find mentions of my product", competitive monitoring, or launch-reaction tracking. Returns recent mentions with source, score, and links; sandbox calls are free.
 license: MIT
-compatibility: Requires network access and an API key from https://404mentions.com (free sandbox samples without billing)
+compatibility: Requires network access and an API key from https://404kidwiz.github.io/mentions-api/ (free sandbox samples without billing)
 ---
 
 # 404 Mentions API — product mention tracking
@@ -21,7 +21,7 @@ Header: `Authorization: Bearer <API_KEY>`
 | `days` | 1–365 | lookback window, default 7 |
 | `sample` | `true` | sandbox mode — free, no credits billed |
 
-## Quick test (no key needed for a feel of the shape — get a key at 404mentions.com)
+## Quick test (no key needed for a feel of the shape — get a key at https://404kidwiz.github.io/mentions-api/)
 
 ```bash
 curl -H "Authorization: Bearer $MENTIONS_KEY" \
@@ -38,7 +38,7 @@ Response: recent mentions (`source`, `title`, `url`, `score`, `created`), plus `
 
 ## Getting a key / topping up
 
-- Keys and credit packs: **https://404mentions.com** — $10 = 100 credits via Stripe.
+- Keys and credit packs: **https://404kidwiz.github.io/mentions-api/** — $10 = 100 credits via Stripe.
 - Top-up link pattern: append `?client_reference_id=<your_api_key>` to the buy link so credits land on your key automatically.
 
 ## Tips

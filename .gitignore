@@ -12,3 +12,4 @@ server.log
 .agent-tools/ponytail-graft/state/
 .claude/.ponytail-active
 .claude/.ponytail-statusline-nudged
+.serena/

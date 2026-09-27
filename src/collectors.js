@@ -3,12 +3,12 @@
 // Hacker News: official Algolia API (free, documented).
 const UA = '404mentions/1.0 (agent-api; contact: 404kidwiz@gmail.com)';
 
-async function fetchJSON(url, timeoutMs = 10000) {
+async function fetchJSON(url, timeoutMs = 10000, extraHeaders = {}) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': UA, Accept: 'application/json' },
+      headers: { 'User-Agent': UA, Accept: 'application/json', ...extraHeaders },
       signal: ctl.signal,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -16,10 +16,41 @@ async function fetchJSON(url, timeoutMs = 10000) {
   } finally { clearTimeout(t); }
 }
 
-// Reddit public search JSON — max ~100 posts per query.
+// Reddit: OAuth app-only (client_credentials) when REDDIT_CLIENT_ID/SECRET are set;
+// falls back to public JSON endpoints (currently 403-blocked in most environments).
+const REDDIT_CLIENT_ID = process.env.REDDIT_CLIENT_ID || null;
+const REDDIT_CLIENT_SECRET = process.env.REDDIT_CLIENT_SECRET || null;
+
+let redditToken = null; // { token, expiresAt }
+async function redditOAuthToken() {
+  if (!REDDIT_CLIENT_ID || !REDDIT_CLIENT_SECRET) return null;
+  if (redditToken && Date.now() < redditToken.expiresAt - 60_000) return redditToken.token;
+  const basic = Buffer.from(`${REDDIT_CLIENT_ID}:${REDDIT_CLIENT_SECRET}`).toString('base64');
+  const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      Authorization: `Basic ${basic}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': UA,
+    },
+    body: 'grant_type=client_credentials',
+  });
+  if (!res.ok) throw new Error(`reddit oauth HTTP ${res.status}`);
+  const j = await res.json();
+  redditToken = { token: j.access_token, expiresAt: Date.now() + (j.expires_in || 3600) * 1000 };
+  return redditToken.token;
+}
+
+// Reddit search — max ~100 posts per query.
 async function redditMentions(product, limit = 100) {
   const q = encodeURIComponent(product);
-  const j = await fetchJSON(`https://www.reddit.com/search.json?q=${q}&sort=new&t=year&limit=${Math.min(limit, 100)}`);
+  const token = await redditOAuthToken();
+  const base = token
+    ? `https://oauth.reddit.com/search?q=${q}`
+    : `https://www.reddit.com/search.json?q=${q}`;
+  const headers = { 'User-Agent': UA, Accept: 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const j = await fetchJSON(`${base}&sort=new&t=year&limit=${Math.min(limit, 100)}`, 10000, headers);
   const posts = (j.data && j.data.children) || [];
   return posts.map(p => ({
     source: 'reddit',

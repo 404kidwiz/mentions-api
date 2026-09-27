@@ -90,6 +90,43 @@ test('unknown key: acked, no credit, no crash', async () => {
   assert.equal(biz.credits, 100);
 });
 
+test('NEW CUSTOMER: no client_reference_id → key auto-issued with purchased credits', async () => {
+  const before = store.listBusinesses.all().length;
+  const body = JSON.stringify({
+    id: 'evt_newcust_1',
+    type: 'checkout.session.completed',
+    data: { object: { id: 'cs_test_new1', client_reference_id: null, amount_total: 1000,
+      customer_details: { email: 'buyer@example.com' } } },
+  });
+  const r = await post(body, sign(body, WHSEC));
+  assert.equal(r.statusCode, 200);
+  const after = store.listBusinesses.all();
+  assert.equal(after.length, before + 1); // new business created
+  const nb = after[after.length - 1];
+  assert.equal(nb.name, 'buyer@example.com');
+  assert.equal(nb.credits, 100); // $10 × 10 credits/$
+  assert.ok(nb.key.startsWith('biz_')); // real usable key
+  // metadata update is best-effort (stripe SDK called with fake key — must not crash)
+});
+
+test('NEW CUSTOMER: unknown key also auto-issues (typo in client_reference_id)', async () => {
+  const body = checkoutEvent('evt_newcust_2', 'biz_typo_key', 1000);
+  const r = await post(body, sign(body, WHSEC));
+  assert.equal(r.statusCode, 200);
+  const all = store.listBusinesses.all();
+  const nb = all[all.length - 1];
+  assert.notEqual(nb.key, 'biz_typo_key'); // a NEW key was issued
+  assert.equal(nb.credits, 100);
+  assert.equal(nb.name, 'stripe-buyer'); // no customer_details → fallback name
+});
+
+test('/billing/success: 400 without session_id, 404 with bogus session', async () => {
+  const r1 = await fastify.inject({ method: 'GET', url: '/billing/success' });
+  assert.equal(r1.statusCode, 400);
+  const r2 = await fastify.inject({ method: 'GET', url: '/billing/success?session_id=cs_test_bogus123' });
+  assert.equal(r2.statusCode, 404); // fake STRIPE_SECRET_KEY → retrieve fails → 404
+});
+
 test('non-checkout event: acked, no action', async () => {
   const body = JSON.stringify({ id: 'evt_other', type: 'payment_intent.created', data: { object: {} } });
   const r = await post(body, sign(body, WHSEC));

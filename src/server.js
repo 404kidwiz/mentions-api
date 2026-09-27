@@ -301,6 +301,27 @@ fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (req, bo
   catch (e) { e.statusCode = 400; done(e, undefined); }
 });
 
+// New-customer flow: paid session with no (or unknown) client_reference_id
+// → auto-issue a business + key, credit the purchase, and persist the key on the
+//   Stripe session metadata so the redirect/success page can show it.
+// Requires STRIPE_SECRET_KEY write access to update session metadata.
+const autoIssueKey = (session, credits, log) => {
+  const name = (session.customer_details && session.customer_details.email)
+    ? session.customer_details.email
+    : 'stripe-buyer';
+  const info = store.createBusiness.run(store.newKey(), name, 500, credits);
+  const biz = store.getBusiness.get(info.lastInsertRowid);
+  // Best-effort: stamp the key onto the session so success-page/ops can surface it
+  try {
+    require('stripe')(STRIPE_SECRET_KEY).checkout.sessions.update(session.id, {
+      metadata: { api_key: biz.key, credits_added: String(credits) },
+    }).catch((e) => log && log.warn({ err: e.message, session: session.id }, 'session metadata update failed'));
+  } catch (e) {
+    if (log) log.warn({ err: e.message }, 'stripe sdk unavailable for metadata update');
+  }
+  return biz;
+};
+
 fastify.post('/v1/billing/webhook', {
   schema: {
     response: { 200: { type: 'object', properties: { received: { type: 'boolean' } } } },
@@ -335,12 +356,6 @@ fastify.post('/v1/billing/webhook', {
   if (seen) return { received: true };
   store.recordStripeEvent.run(eventId);
 
-  const biz = apiKey ? store.getBusinessByKey.get(apiKey) : null;
-  if (!biz) {
-    req.log.error({ eventId, client_reference_id: apiKey }, 'paid but no matching business key');
-    return { received: true }; // ack so Stripe stops retrying; reconcile manually
-  }
-
   const dollars = (session.amount_total || 0) / 100;
   const credits = Math.floor(dollars * CREDITS_PER_DOLLAR);
   if (credits <= 0) {
@@ -348,9 +363,63 @@ fastify.post('/v1/billing/webhook', {
     return { received: true };
   }
 
-  store.addCredits.run(credits, biz.id);
-  req.log.info({ eventId, biz: biz.id, dollars, credits }, 'credits added via Stripe');
+  const biz = apiKey ? store.getBusinessByKey.get(apiKey) : null;
+  if (biz) {
+    store.addCredits.run(credits, biz.id);
+    req.log.info({ eventId, biz: biz.id, dollars, credits }, 'credits added via Stripe');
+    return { received: true };
+  }
+
+  // No matching key → first purchase by a new customer: auto-issue key + credits
+  const newBiz = autoIssueKey(session, credits, req.log);
+  req.log.info({ eventId, biz: newBiz.id, dollars, credits, key: newBiz.key }, 'new customer: key auto-issued');
   return { received: true };
+});
+
+// --- Purchase success page ----------------------------------------------------
+// Stripe Payment Link redirects here after payment (?session_id=...). We look up
+// the session and show the buyer their API key (set by the webhook via metadata)
+// plus a ready-to-copy curl. Falls back to a friendly "processing" page if the
+// webhook hasn't landed yet (buyer can refresh).
+const successHtml = (key, credits) => `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Your API key — 404 Mentions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ body{background:#0a0a0f;color:#e8e8f0;font-family:-apple-system,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+ .card{background:#12121a;border:1px solid #1e1e2e;border-radius:16px;padding:40px;max-width:560px;width:92%}
+ h1{font-size:26px;margin:0 0 6px} p{color:#9494a8;font-size:15px}
+ .key{background:#0d0d14;border:1px solid #7c5cff;border-radius:10px;padding:14px;font-family:monospace;font-size:16px;color:#00d4aa;margin:18px 0;word-break:break-all}
+ pre{background:#0d0d14;border-radius:10px;padding:14px;font-size:13px;overflow-x:auto;color:#c8c8dc}
+ a{color:#7c5cff}
+</style></head><body><div class="card">
+<h1>✅ Payment received — ${credits} credits added</h1>
+<p>Save this API key. It's shown only once here (also in your Stripe receipt email context), and credits never expire.</p>
+<div class="key">${key}</div>
+<pre>curl "https://mentions-api-404-production.up.railway.app/v1/mentions?product=linear.app&days=30" \\
+  -H "Authorization: Bearer ${key}"</pre>
+<p>Free preview calls: add <b>&amp;sample=true</b> — never billed.<br>
+Top up anytime: <a href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00?client_reference_id=${key}">buy 100 more credits</a></p>
+</div></body></html>`;
+
+fastify.get('/billing/success', async (req, reply) => {
+  if (!STRIPE_SECRET_KEY) return reply.code(503).send({ error: 'billing disabled' });
+  const sid = req.query && req.query.session_id;
+  if (!sid || !/^cs_(test_)?[A-Za-z0-9]+$/.test(sid)) {
+    return reply.code(400).send({ error: 'missing session_id' });
+  }
+  let session;
+  try {
+    session = await require('stripe')(STRIPE_SECRET_KEY).checkout.sessions.retrieve(sid);
+  } catch (e) {
+    return reply.code(404).send({ error: 'session not found' });
+  }
+  const key = session.metadata && session.metadata.api_key;
+  if (key) {
+    reply.type('text/html').send(successHtml(key, session.metadata.credits_added || '100'));
+  } else {
+    // Webhook not landed yet — ask the buyer to refresh in a few seconds
+    reply.type('text/html').send(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>Processing…</title></head><body style="background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center"><p>Finalizing your purchase… this page refreshes automatically (5s).</p></body></html>`);
+  }
 });
 
 const start = async () => {

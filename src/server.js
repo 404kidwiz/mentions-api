@@ -4,6 +4,14 @@
 // Billing is atomic: cap-check, debit, and receipt happen in one SQLite transaction
 // AFTER collection succeeds — no charge without a receipt, no unbilled success.
 const fastify = require('fastify')({ logger: true });
+
+// CORS: allow any origin to READ the public sandbox (keyless sample=true).
+// Live calls need a key, which must not be exposed in browsers anyway.
+fastify.addHook('onRequest', async (req, reply) => {
+  if (req.method === 'GET' && req.url.startsWith('/v1/mentions')) {
+    reply.header('Access-Control-Allow-Origin', '*');
+  }
+});
 const store = require('./db');
 const collectors = require('./collectors');
 
@@ -131,7 +139,34 @@ fastify.get('/v1/mentions', {
   const isSandbox = sample === 'true' || sample === '1';
 
   const key = authKey(req);
-  if (!key) return reply.code(401).send({ error: 'missing key', hint: 'Authorization: Bearer <key>' });
+
+  // Keyless public sandbox: no Authorization header + sample=true is allowed
+  // (rate-limited by IP below). Any live call still requires a valid key.
+  if (!key && isSandbox) {
+    const ip = req.ip || 'unknown';
+    if (rateLimited(`pub:${ip}`)) {
+      return reply.code(429).send({ error: 'rate limit', retry_after_s: 60 });
+    }
+    let data;
+    try {
+      data = await collectMentions(product, days);
+    } catch (e) {
+      return reply.code(502).send({ error: 'upstream failure', detail: String(e.message || e) });
+    }
+    return {
+      product, window: `${days}d`,
+      total_mentions: data.total,
+      complaints_flagged: data.complaints,
+      sources: data.sources,
+      truncated: data.truncated,
+      sample: true,
+      mentions: data.mentions.slice(0, 5),
+      credits_remaining: null,
+      note: 'public sandbox: 5 sample posts, free. Get a key for full results.',
+    };
+  }
+
+  if (!key) return reply.code(401).send({ error: 'missing key', hint: 'Authorization: Bearer ***' });
   const biz = store.getBusinessByKey.get(key);
   if (!biz) return reply.code(401).send({ error: 'invalid key' });
 

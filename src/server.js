@@ -404,7 +404,7 @@ Top up anytime: <a href="https://buy.stripe.com/dRmdR8cJQ3mMdek1wh2Fa00?client_r
 fastify.get('/billing/success', async (req, reply) => {
   if (!STRIPE_SECRET_KEY) return reply.code(503).send({ error: 'billing disabled' });
   const sid = req.query && req.query.session_id;
-  if (!sid || !/^cs_(test_)?[A-Za-z0-9]+$/.test(sid)) {
+  if (!sid || !/^cs_[A-Za-z0-9_]+$/.test(sid)) {
     return reply.code(400).send({ error: 'missing session_id' });
   }
   let session;
